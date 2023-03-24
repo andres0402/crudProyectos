@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.sql.Date;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,7 +34,7 @@ public class ProjectController {
                 projectService.allProjects().forEach(projects::add);
 
             if (projects.isEmpty()) {
-                return new ResponseEntity(new Message("No se encontraron proyectos"), HttpStatus.NO_CONTENT);
+                return new ResponseEntity(new Message("No se encontraron proyectos"), HttpStatus.NOT_FOUND);
             }
 
             return new ResponseEntity<>(projects, HttpStatus.OK);
@@ -49,7 +50,7 @@ public class ProjectController {
             projectService.findAll(id).forEach(projects::add);
 
             if (projects.isEmpty()) {
-                return new ResponseEntity(new Message("No hay proyectos registrados para este usuario"), HttpStatus.NO_CONTENT);
+                return new ResponseEntity(new Message("No hay proyectos registrados para este usuario"), HttpStatus.NOT_FOUND);
             }
 
             return new ResponseEntity<>(projects, HttpStatus.OK);
@@ -131,23 +132,55 @@ public class ProjectController {
         }
     }
 
+    @GetMapping("/servicios/proyectos/tipo/{tipo}")
+    public ResponseEntity<List<Project>> getByType(@PathVariable("tipo") String project_type) {
+        List<Project> projectData = projectService.findProjectByType(project_type.toLowerCase());
+
+        if (!projectData.isEmpty()) {
+            return new ResponseEntity<>(projectData, HttpStatus.OK);
+        } else {
+            return new ResponseEntity(new Message("No hay proyectos de este tipo registrados"), HttpStatus.NOT_FOUND);
+        }
+    }
+
+    @GetMapping("/usuario/{usuario_id}/proyectos/tipo/{tipo}")
+    public ResponseEntity<List<Project>> getProjectByType(@PathVariable("usuario_id") int user_id, @PathVariable("tipo") String project_type) {
+        List<Project> projectData = projectService.findUserProjectByType(user_id, project_type.toLowerCase());
+
+        if (!projectData.isEmpty()) {
+            return new ResponseEntity<>(projectData, HttpStatus.OK);
+        } else {
+            return new ResponseEntity(new Message("No hay proyectos de este tipo registrados"), HttpStatus.NOT_FOUND);
+        }
+    }
+
 
     @PostMapping("/servicios/proyectos/crear")
     public ResponseEntity<Project> createProject(@RequestBody Project project) {
+        List<String> tipos = new ArrayList<>(Arrays.asList("modificacion", "reparacion"));
+
+
         try {
+            if(!tipos.contains(project.getProject_type().toLowerCase())){
+                return new ResponseEntity(new Message("Ingrese correctamente el tipo de proyecto"), HttpStatus.INTERNAL_SERVER_ERROR);
+            }
             Project _project = projectService
-                    .save(new Project(project.getTitle(), project.getProject_description(), project.getProject_date(), project.getUser()));
+                    .save(new Project(project.getTitle(), project.getProject_description(), project.getProject_date(),project.getProject_type().toLowerCase(), project.getUser()));
             return new ResponseEntity<>(_project, HttpStatus.CREATED);
         } catch (Exception e) {
-            return new ResponseEntity(new Message("Se produjo un error al crear el proyectos"), HttpStatus.INTERNAL_SERVER_ERROR);
+            return new ResponseEntity(new Message("Se produjo un error al crear el proyecto"), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     @PostMapping("/usuario/{usuario_id}/proyectos/crear")
     public ResponseEntity<Project> createProjectUser(@PathVariable("usuario_id") int user_id, @RequestBody Project project) {
-        try {
+        List<String> tipos = new ArrayList<>(Arrays.asList("modificacion", "reparacion"));
 
-            Project p = new Project(project.getTitle(), project.getProject_description(), project.getProject_date(), user_id);
+        try {
+            if(!tipos.contains(project.getProject_type().toLowerCase())){
+                return new ResponseEntity(new Message("Ingrese correctamente el tipo de proyecto"), HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+            Project p = new Project(project.getTitle(), project.getProject_description(), project.getProject_date(), project.getProject_type().toLowerCase(), user_id);
 
 
 
@@ -168,13 +201,30 @@ public class ProjectController {
     @PutMapping("/usuario/{usuario_id}/proyectos/{id}/editar")
     public ResponseEntity<Project> updateProject(@PathVariable("usuario_id") int user_id, @PathVariable("id") int id, @RequestBody Project project) {
         Optional<Project> projectData = projectService.findById(user_id, id);
+        List<String> tipos = new ArrayList<>(Arrays.asList("modificacion", "reparacion"));
+
+        if(!tipos.contains(project.getProject_type().toLowerCase())){
+            return new ResponseEntity(new Message("Ingrese correctamente el tipo de proyecto"), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
 
         if (projectData.isPresent()) {
             Project _project = projectData.get();
             _project.setTitle(project.getTitle());
             _project.setProject_description(project.getProject_description());
             _project.setProject_date(project.getProject_date());
-            _project.setUser(user_id);
+            _project.setProject_type(project.getProject_type().toLowerCase());
+            if(project.getUser() == 0) {
+                _project.setUser(_project.getUser());
+            }
+            else{
+                _project.setUser(project.getUser());
+                Optional<UserProject> userData = userProjectRepository.findById(_project.getId());
+                if (userData.isPresent()) {
+                    UserProject _user = userData.get();
+                    _user.setUser_id(project.getUser());
+                    userProjectRepository.save(_user);
+                }
+            }
             return new ResponseEntity<>(projectService.save(_project), HttpStatus.OK);
         } else {
             return new ResponseEntity(new Message("El proyecto a editar no se encuentra registrado"), HttpStatus.NOT_FOUND);
@@ -184,17 +234,32 @@ public class ProjectController {
     @PutMapping("/servicios/proyectos/{id}/editar")
     public ResponseEntity<Project> updateProject(@PathVariable("id") int id, @RequestBody Project project) {
         Optional<Project> projectData = projectService.findOne(id);
+        List<String> tipos = new ArrayList<>(Arrays.asList("modificacion", "reparacion"));
+
+        if(!tipos.contains(project.getProject_type().toLowerCase())){
+            return new ResponseEntity(new Message("Ingrese correctamente el tipo de proyecto"), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
 
         if (projectData.isPresent()) {
             Project _project = projectData.get();
             _project.setTitle(project.getTitle());
             _project.setProject_description(project.getProject_description());
             _project.setProject_date(project.getProject_date());
+            _project.setProject_type(project.getProject_type().toLowerCase());
             if(project.getUser() == 0) {
                 _project.setUser(_project.getUser());
             }
             else{
                 _project.setUser(project.getUser());
+                Optional<UserProject> userData = userProjectRepository.findById(_project.getId());
+                if (userData.isPresent()) {
+                    UserProject _user = userData.get();
+                    _user.setUser_id(project.getUser());
+                    userProjectRepository.save(_user);
+                }
+                else{
+                    userProjectRepository.save(new UserProject(project.getUser(), _project.getId()));
+                }
             }
             return new ResponseEntity<>(projectService.save(_project), HttpStatus.OK);
         } else {

@@ -131,6 +131,28 @@ public class ProjectService {
         projectRepository.deleteAll();
     }
 
+    public List<Project> findProjectByType(String type){
+        type = type.toLowerCase();
+        List <Project> projects = projectRepository.findAll(), results = new ArrayList<>();
+        for (Project p: projects){
+            if (p.getProject_type().equals(type)){
+                results.add(p);
+            }
+        }
+        return results;
+    }
+    public List<Project> findUserProjectByType(int user_id, String type){
+        type = type.toLowerCase();
+        List <Project> projects = this.findAll(user_id), results = new ArrayList<>();
+        for (Project p: projects){
+            if (p.getProject_type().equals(type)){
+                results.add(p);
+            }
+        }
+        return results;
+    }
+
+
 
 
 
